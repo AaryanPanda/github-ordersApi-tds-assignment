@@ -38,10 +38,17 @@ async def rate_limit(request: Request, call_next):
         while hits and hits[0] <= now - WINDOW:
             hits.popleft()
         if len(hits) >= RATE_LIMIT:                # already used all R this window
+            # NOTE: this 429 is created before the CORS layer runs, so we must
+            # attach the CORS headers by hand — otherwise the browser blocks the
+            # grader from reading the response ("Failed to fetch").
             return JSONResponse(
                 {"error": "rate limit exceeded"},
                 status_code=429,
-                headers={"Retry-After": str(WINDOW)},
+                headers={
+                    "Retry-After": str(WINDOW),
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Expose-Headers": "Retry-After",
+                },
             )
         hits.append(now)                           # record this request
     return await call_next(request)
